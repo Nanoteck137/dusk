@@ -26,6 +26,10 @@ var rootCmd = &cobra.Command{
 			return printExtensions(cmd, path)
 		}
 
+		if showLargest {
+			return printLargestFiles(cmd, path)
+		}
+
 		size, err := service.DiskUsage(path)
 		if err != nil {
 			return err
@@ -40,10 +44,25 @@ var rootCmd = &cobra.Command{
 }
 
 var showExtensions bool
+var showLargest bool
 
 func init() {
 	rootCmd.SetVersionTemplate(dusk.VersionTemplate(dusk.AppName))
 	rootCmd.Flags().BoolVarP(&showExtensions, "extensions", "e", false, "show space used per file extension")
+	rootCmd.Flags().BoolVarP(&showLargest, "largest", "l", false, "show some of the largest files")
+}
+
+func printLargestFiles(cmd *cobra.Command, path string) error {
+	files, err := service.LargestFiles(path, 10)
+	if err != nil {
+		return err
+	}
+
+	for _, f := range files {
+		cmd.Printf("%s\t%s\n", service.HumanSize(f.Size), f.Path)
+	}
+
+	return nil
 }
 
 func printExtensions(cmd *cobra.Command, path string) error {

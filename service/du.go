@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/fs"
 	"path/filepath"
+	"sort"
 	"strings"
 )
 
@@ -70,6 +71,54 @@ func ext(name string) string {
 
 var extAliases = map[string]string{
 	".jpeg": ".jpg",
+}
+
+// File is a regular file and its size in bytes.
+type File struct {
+	Path string
+	Size int64
+}
+
+// LargestFiles returns the n largest regular files under path in descending
+// order of size.
+func LargestFiles(path string, n int) ([]File, error) {
+	files := make([]File, 0)
+
+	err := filepath.WalkDir(path, func(name string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if !entry.Type().IsRegular() {
+			return nil
+		}
+
+		info, err := entry.Info()
+		if err != nil {
+			return err
+		}
+
+		files = append(files, File{Path: name, Size: info.Size()})
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	sort.Slice(files, func(i, j int) bool {
+		if files[i].Size != files[j].Size {
+			return files[i].Size > files[j].Size
+		}
+
+		return files[i].Path < files[j].Path
+	})
+
+	if n < len(files) {
+		files = files[:n]
+	}
+
+	return files, nil
 }
 
 // HumanSize formats a size in bytes as a human readable string, e.g. 12K.
