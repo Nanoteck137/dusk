@@ -1,0 +1,13 @@
+node_modules/
+/tmp/
+/test/
+/work/
+/mockdata/
+/build/
+
+.direnv
+.env*
+
+.DS_Store
+config.toml
+result
