@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"sort"
 
 	"github.com/nanoteck137/dusk"
 	"github.com/nanoteck137/dusk/dev"
@@ -21,6 +22,10 @@ var rootCmd = &cobra.Command{
 			path = args[0]
 		}
 
+		if showExtensions {
+			return printExtensions(cmd, path)
+		}
+
 		size, err := service.DiskUsage(path)
 		if err != nil {
 			return err
@@ -34,8 +39,56 @@ var rootCmd = &cobra.Command{
 	},
 }
 
+var showExtensions bool
+
 func init() {
 	rootCmd.SetVersionTemplate(dusk.VersionTemplate(dusk.AppName))
+	rootCmd.Flags().BoolVarP(&showExtensions, "extensions", "e", false, "show space used per file extension")
+}
+
+func printExtensions(cmd *cobra.Command, path string) error {
+	usage, err := service.ExtensionUsage(path)
+	if err != nil {
+		return err
+	}
+
+	exts := make([]string, 0, len(usage))
+	for ext := range usage {
+		exts = append(exts, ext)
+	}
+
+	sort.Slice(exts, func(i, j int) bool {
+		if exts[i] == "" {
+			return false
+		}
+		if exts[j] == "" {
+			return true
+		}
+
+		if usage[exts[i]] != usage[exts[j]] {
+			return usage[exts[i]] > usage[exts[j]]
+		}
+
+		return exts[i] < exts[j]
+	})
+
+	for _, ext := range exts {
+		label := ext
+		if label == "" {
+			label = "(no extension)"
+		}
+
+		cmd.Printf("%s\t%s\n", service.HumanSize(usage[ext]), label)
+	}
+
+	var total int64
+	for _, size := range usage {
+		total += size
+	}
+
+	cmd.Printf("%s\tTOTAL\n", service.HumanSize(total))
+
+	return nil
 }
 
 func main() {

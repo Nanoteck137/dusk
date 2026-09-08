@@ -4,15 +4,33 @@ import (
 	"fmt"
 	"io/fs"
 	"path/filepath"
+	"strings"
 )
 
 // DiskUsage returns the total size in bytes of the regular files under path.
 // Unlike GNU du it does not count directory entries or special files, so the
 // result is the sum of file sizes and is independent of the filesystem.
 func DiskUsage(path string) (int64, error) {
-	var total int64
+	usage, err := ExtensionUsage(path)
+	if err != nil {
+		return 0, err
+	}
 
-	err := filepath.WalkDir(path, func(_ string, entry fs.DirEntry, err error) error {
+	var total int64
+	for _, size := range usage {
+		total += size
+	}
+
+	return total, nil
+}
+
+// ExtensionUsage returns the total size in bytes of the regular files under
+// path, grouped by file extension (including the leading dot). Hidden files
+// and files without an extension are grouped under the empty string.
+func ExtensionUsage(path string) (map[string]int64, error) {
+	usage := make(map[string]int64)
+
+	err := filepath.WalkDir(path, func(name string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -26,11 +44,32 @@ func DiskUsage(path string) (int64, error) {
 			return err
 		}
 
-		total += info.Size()
+		usage[ext(name)] += info.Size()
 		return nil
 	})
 
-	return total, err
+	return usage, err
+}
+
+// ext returns the file extension of name in lowercase, including the leading
+// dot. Hidden files have no extension, and aliases are mapped to a canonical
+// extension.
+func ext(name string) string {
+	base := filepath.Base(name)
+	if strings.HasPrefix(base, ".") {
+		return ""
+	}
+
+	e := strings.ToLower(filepath.Ext(name))
+	if alias, ok := extAliases[e]; ok {
+		return alias
+	}
+
+	return e
+}
+
+var extAliases = map[string]string{
+	".jpeg": ".jpg",
 }
 
 // HumanSize formats a size in bytes as a human readable string, e.g. 12K.
